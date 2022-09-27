@@ -1,0 +1,11 @@
+---
+
+- hosts: test-server
+  become: true
+
+  vars:
+    docker_image_name: 1111111
+
+  tasks:
+    - name: start the container
+      command: docker run -d --restart=always -p8080:8080 --log-driver json-file --log-opt {%raw%}tag="{{.ImageName}}|{{.Name}}"{%endraw%} "{{ docker_image_name }}"
