@@ -1,0 +1,13 @@
+---
+
+- name: Allow TCP Ports
+  iptables:
+    chain: INPUT
+    rule_num: '1'
+    action: insert
+    protocol: tcp
+    jump: ACCEPT
+    destination_port: "9099"
+
+
+    

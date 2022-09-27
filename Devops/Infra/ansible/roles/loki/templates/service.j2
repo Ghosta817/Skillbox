@@ -1,0 +1,14 @@
+[Unit]
+Description=Loki Service
+After=network.target
+
+[Service]
+Type=simple
+User={{ loki_system_user }}
+Group={{ loki_system_group }}
+ExecStart=/usr/local/bin/loki -config.file={{ loki_config_file }}
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+---
+# defaults file for Grafana
+
+grafana_userId: grafana
+grafana_groupId: grafana
+
+grafana_domain_name: "grafana.skillboxdevopsdiploma-ilya.gq"
+grafana_full_domain_name: "http://{{ grafana_domain_name }}"
+internal_loki_ip: "http://{{hostvars[groups['log_srv'][0]].int_log_ip}}:3100"
+
+admin_user: admin
+admin_password: Gra0808fana

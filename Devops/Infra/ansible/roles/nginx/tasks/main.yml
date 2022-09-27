@@ -1,0 +1,39 @@
+---
+
+- name: Install Nginx
+  apt: 
+    pkg: 
+      - nginx
+  register: result
+  until: result is succeeded
+  retries: 5
+  delay: 15
+
+- name: Ensure that the default nginx symlink is absent
+  file:
+    path: "/etc/nginx/sites-enabled/default"
+    state: absent
+
+- name: Template nginx config to /etc/nginx/sites-enabled/prometheus
+  template:
+    src: "prometheus.j2"
+    dest: "/etc/nginx/sites-enabled/prometheus"
+    owner: root
+    group: root
+    mode:  0644
+
+- name: Template nginx config to /etc/nginx/conf.d/grafana.conf
+  template:
+    src: "grafana.conf.j2"
+    dest: "/etc/nginx/conf.d/grafana.conf"
+    owner: root
+    group: root
+    mode:  0644
+  notify: 
+  - Restart nginx
+
+- name: Restart nginx
+  service: 
+    name: nginx
+    daemon_reload: true
+    state: restarted

@@ -1,0 +1,13 @@
+---
+
+- name: Gitlab-runner checks installation
+  stat:
+    path: /usr/local/bin/gitlab-runner
+  register: runner_installed
+
+- name: Gitlab-runner manage binary
+  import_tasks: install.yml
+  when: not runner_installed.stat.exists
+
+- name: Gitlab-runner register runner
+  import_tasks: register.yml

@@ -1,0 +1,51 @@
+---
+
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0755
+  with_items:
+    - /opt/cadvisor
+
+- name: Download cadvisor
+  get_url:
+    url: "{{ cadvisor_download }}"
+    checksum: "sha256:{{ cadvisor_checksum }}"
+    dest: "/opt/cadvisor/cadvisor-{{ cadvisor_version }}"
+    force: false
+    mode: 0755
+  when: cadvisor_binary_local_dir | length == 0
+
+- name: Propagate locally distributed cadvisor binary
+  copy:
+    src: "{{ cadvisor_binary_local_dir }}/cadvisor-{{ cadvisor_version }}"
+    dest: "/opt/cadvisor/cadvisor-{{ cadvisor_version }}"
+    mode: 0755
+    owner: root
+    group: root
+  when: cadvisor_binary_local_dir | length > 0
+  notify:
+    - restart cadvisor
+
+- name: Create cadvisor symlink
+  file:
+    src: "/opt/cadvisor/cadvisor-{{ cadvisor_version }}"
+    path: /opt/cadvisor/cadvisor
+    force: true
+    state: link
+
+- name: Server systemd service
+  template:
+    dest: /etc/systemd/system/cadvisor.service
+    src: systemd-system-cadvisor-service.j2
+    mode: 0644
+  notify:
+    - restart cadvisor
+
+- name: Enable and start server systemd
+  systemd:
+    enabled: true
+    name: cadvisor.service
+    state: started
+    daemon_reload: true

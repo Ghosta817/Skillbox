@@ -1,0 +1,48 @@
+---
+
+- name: Install required system packages
+  apt:
+    pkg: "{{ item }}"
+    state: latest
+    update_cache: true
+  loop: "{{ packages }}"
+  tags: install_packages
+
+- name: Download binary
+  get_url:
+    url: "{{ runner_binary_url }}"
+    dest: /usr/local/bin/gitlab-runner
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Create user
+  user:
+    name: "{{ runner_username }}"
+    comment: Gitlab Runner
+    shell: /bin/bash
+    create_home: yes
+
+- name: Add user to docker group
+  user:
+    name: "{{ runner_username }}"
+    groups: docker
+    append: yes
+
+- name: Create directories
+  file:
+    path: "{{ runner_working_dir }}"
+    state: directory
+    owner: "{{ runner_username }}"
+    group: root
+    mode: 0755
+
+- name: Installation
+  command: /usr/local/bin/gitlab-runner install --user={{ runner_username }} --working-directory={{ runner_working_dir }}
+  notify: Restart gitlab-runner
+
+- name: Remove .bash_logout
+  file:
+    path: "/home/{{ runner_username }}/.bash_logout"
+    state: absent
+  

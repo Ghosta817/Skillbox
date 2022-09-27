@@ -1,0 +1,15 @@
+---
+
+- name: Pretask For Loki
+  include_tasks: tasks/pre_install.yml
+
+- name: Install Loki
+  include_tasks: tasks/install_loki.yml
+
+- name: Ensure Loki service is started and enabled
+  become: True
+  systemd:
+    daemon_reload: True
+    name: "{{ loki_systemd_service }}"
+    state: started
+    enabled: True

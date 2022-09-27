@@ -1,0 +1,140 @@
+---
+
+promtail_apt_update_cache: True
+promtail_version: "2.6.1"
+promtail_dist_url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"
+promtail_checksum: "sha256:5d06002daf82b0b04ad1dacfca4876a13a114fcc484b324df353c409abdfb3bc"
+promtail_config_dir: /etc/promtail
+promtail_config_file_sd_dir: "{{ promtail_config_dir }}/file_sd"
+promtail_config_file: "{{ promtail_config_dir }}/promtail.yml"
+
+promtail_system_user: promtail
+promtail_system_group: "{{ promtail_system_user }}"
+promtail_user_additional_groups: "adm"
+promtail_systemd_service_template_file: service.j2
+promtail_systemd_service: promtail
+
+promtail_install_dir: /opt/promtail
+promtail_tmp_dir: /tmp
+
+promtail_log_level: info  # One of: debug, info, warn, error
+
+
+# Grafana Promtail config file
+
+# server
+promtail_config_server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# positions
+promtail_positions_directory: /var/lib/promtail
+promtail_config_positions:
+  filename: "{{ promtail_positions_directory }}/positions.yml"
+  sync_period: "60s"
+
+# clients
+promtail_loki_server_url: "http://{{hostvars[groups['log_srv'][0]].int_log_ip}}:3100"
+promtail_config_clients:
+  - url: "{{ promtail_loki_server_url }}/loki/api/v1/push"
+
+# scrape_configs
+promtail_config_include_default_file_sd_config: True
+promtail_config_default_file_sd_config:
+  - job_name: file_sd
+    file_sd_configs:
+      - files:
+          - "{{ promtail_config_file_sd_dir }}/*.yml"
+          - "{{ promtail_config_file_sd_dir }}/*.yaml"
+          - "{{ promtail_config_file_sd_dir }}/*.json"
+
+# scrape for all servers
+promtail_config_scrape_configs:
+   - job_name: system
+     static_configs:
+     - targets:
+         - localhost
+       labels:
+         job: var_logs
+         host: "{{ ansible_hostname }}"
+         __path__: /var/log/*log
+
+# addititional scrape for Nginx on monitoring server
+promtail_config_scrape_configs_monitoring:
+   - job_name: nginx
+     static_configs:
+     - targets:
+         - localhost
+       labels:
+         job: nginx_logs
+         host: "{{ ansible_hostname }}"
+         __path__: /var/log/nginx/*.log
+
+# addititional scrape for Docker on dev/prod servers
+# promtail_config_scrape_configs_dev_prod:
+#    - job_name: containers
+
+#      static_configs:
+#      - targets:
+#          - localhost
+#        labels:
+#          job: containers_logs
+#          host: "{{ ansible_hostname }}"
+#          __path__: /var/lib/docker/containers/*/*log
+     
+#      pipeline_stages:
+#      - json:
+#          expressions:
+#            stream: stream
+#            attrs: attrs
+#            tag: attrs.tag
+#      - regex:
+#          expression: (?P<image_name>(?:[^|]*[^|])).(?P<container_name>(?:[^|]*[^|])).(?P<image_id>(?:[^|]*[^|])).(?P<container_id>(?:[^|]*[^|]))
+#          source: "tag"
+#      - labels:
+#          tag:
+#          stream:
+#          image_name:
+#          container_name:
+#          image_id:
+#          container_id:
+
+promtail_config_scrape_configs_dev_prod:
+   - job_name: containers
+
+     static_configs:
+     - targets:
+         - localhost
+       labels:
+         job: containers_logs
+         host: "{{ ansible_hostname }}"
+         __path__: /var/lib/docker/containers/*/*log
+     
+     pipeline_stages:
+     - json:
+         expressions:
+           output: log
+           stream: stream
+           attrs:
+     - json:
+         expressions:
+           tag:
+         source: attrs     
+     - regex:
+         expression: (?P<image_name>(?:[^|]*[^|])).(?P<container_name>(?:[^|]*[^|]))
+         source: tag
+     - timestamp:
+         format: RFC3339Nano
+         source: time
+     - labels:
+         # tag:
+         stream:
+         image_name:
+         container_name:
+     - output:
+         source: output
+
+
+promtail_target_config: {}
+#  promtail_target_config:
+#    sync_period: "10s"

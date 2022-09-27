@@ -1,0 +1,10 @@
+---
+# vars file for Prometheus
+
+prometheus_userId:    prometheus
+prometheus_groupId:   prometheus
+alertmanager_userId:  alertmanager
+alertmanager_groupId: alertmanager
+prometheus_version:   2.35.0
+alertmanager_version: 0.24.0
+

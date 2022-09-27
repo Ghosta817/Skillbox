@@ -1,0 +1,7 @@
+---
+# tasks file for Prometheus
+- name: Pretask For Install cAdvisor
+  include_tasks: tasks/pre_install.yml
+
+- name: Install cAdvisor
+  include_tasks: tasks/install_cadvisor.yml

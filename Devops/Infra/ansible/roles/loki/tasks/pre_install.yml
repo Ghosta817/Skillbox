@@ -1,0 +1,15 @@
+---
+
+- name: Security Settings For Debian
+  block:
+    - name: Allow TCP Ports
+      iptables:
+        chain: INPUT
+        rule_num: '1'
+        action: insert
+        protocol: tcp
+        jump: ACCEPT
+        destination_port: "3100"
+
+  when:
+    ansible_os_family == "Debian"

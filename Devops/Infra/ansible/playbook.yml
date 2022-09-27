@@ -1,0 +1,35 @@
+---
+
+- hosts: log_srv
+  become: true
+  roles:
+    - loki
+  tags: logs
+
+- hosts: all
+  become: true
+  roles:
+    - node_exporter
+    - promtail
+  tags: agents
+
+- hosts: app_srvs # All test and production servers
+  become: true
+  roles:
+    - docker
+    - gitlab_runner
+    - cadvisor
+  tags:
+    devprod
+
+- hosts: monitor_srv
+  become: true
+  vars:
+    prometheus_domain_name: "monitoring.skillboxdevopsdiploma-ilya.gq"
+    grafana_domain_name: "grafana.skillboxdevopsdiploma-ilya.gq"
+  roles:
+    - nginx
+    - prometheus
+    - grafana
+  
+  tags: monitoring

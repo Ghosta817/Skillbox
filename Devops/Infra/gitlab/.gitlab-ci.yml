@@ -1,0 +1,96 @@
+stages:
+  - test
+  - build
+  - pre_deploy
+  - deploy
+  - production
+
+variables:
+  DOCKER_CONTAINER_NAME: skillbox
+  DOCKER_CONTAINER_TAG: app
+  FULL_DOCKER_CONTAINER_NAME: cr.yandex/${YC_CONTAINER_REGESTRY_ID}/${DOCKER_CONTAINER_NAME}:${DOCKER_CONTAINER_TAG}
+
+some_tests:
+   stage: test
+   script:
+     - ./run-tests.sh
+   tags:
+     - test-stage-shell
+
+build_image:
+  stage: build
+  image: docker:stable
+  services:
+  - name: docker:dind
+    alias: the_docker_host
+  variables: 
+    DOCKER_HOST: tcp://the_docker_host:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker login --username "${YC_CONTAINER_REGESTRY_ACCOUNT_NAME}" --password "${YC_CONTAINER_REGESTRY_TOKEN}" cr.yandex
+    - docker build -t "${FULL_DOCKER_CONTAINER_NAME}" .
+    - docker push "${FULL_DOCKER_CONTAINER_NAME}"
+  tags:
+    - test-stage-docker
+  only:
+    - master
+    - uat
+
+prepare_deploy:
+  stage: pre_deploy
+  script:
+    # Если контейнер предыдущей версии присутствует его надо удалить.
+    - if docker ps -a | grep -q "${FULL_DOCKER_CONTAINER_NAME}"; then docker rm -f $(docker ps -a | grep "${FULL_DOCKER_CONTAINER_NAME}" | awk '{ print $1 }'); fi
+    - docker login --username "${YC_CONTAINER_REGESTRY_ACCOUNT_NAME}" --password "${YC_CONTAINER_REGESTRY_TOKEN}" cr.yandex
+    - docker pull "${FULL_DOCKER_CONTAINER_NAME}"
+    - if docker images | grep -q "<none>"; then docker rmi $(docker images | grep "<none>" | awk '{ print $3 }'); fi # удаляем старый имидж
+  tags:
+    - test-stage-shell
+  only:
+    - master
+    - uat
+
+deploy_to_test:
+  stage: deploy
+  image: docker:stable
+  services:
+  - name: docker:dind
+    alias: the_docker_host
+  variables:
+    ANSIBLE_HOSTS_FILE: "test-server ansible_host=${CI_RUNNER_DESCRIPTION} ansible_user=${DEPLOY_ANSIBLE_USERNAME} ansible_connection=ssh"
+    DOCKER_HOST: tcp://the_docker_host:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    # Заполняем файлы необходимые для старта ansible-runner
+    - echo ${ANSIBLE_HOSTS_FILE} > "$(pwd)/test-srv/inventory/hosts"
+    - cp ${SKILLBOX_SSH_KEY} "$(pwd)/test-srv/env/ssh_key"
+    - sed -i "s/1111111/cr.yandex\/${YC_CONTAINER_REGESTRY_ID}\/${DOCKER_CONTAINER_NAME}:${DOCKER_CONTAINER_TAG}/g" $(pwd)/test-srv/project/test_server.yml
+    # Запускаем плейбук
+    - docker run --rm -e RUNNER_PLAYBOOK=test_server.yml -v $PWD/test-srv:/runner quay.io/ansible/ansible-runner:stable-2.12-latest
+  tags:
+    - test-stage-docker
+  only:
+    - master
+    - uat
+ 
+deploy_to_production:
+  stage: production
+  before_script:
+    # Если контейнер предыдущей версии присутствует его надо удалить.
+    - if docker ps -a | grep -q "${FULL_DOCKER_CONTAINER_NAME}"; then docker rm -f $(docker ps -a | grep "${FULL_DOCKER_CONTAINER_NAME}" | awk '{ print $1 }'); fi
+    # Логинимся в Yandex Cloud registry
+    - docker login --username "${YC_CONTAINER_REGESTRY_ACCOUNT_NAME}" --password "${YC_CONTAINER_REGESTRY_TOKEN}" cr.yandex
+    # Забираем имидж с приложением на продакшн сервер
+    - docker pull "${FULL_DOCKER_CONTAINER_NAME}"
+    # Удаляем старый имидж
+    - if docker images | grep -q "<none>"; then docker rmi $(docker images | grep "<none>" | awk '{ print $3 }'); fi # удаляем старый имидж
+  script:
+    - docker run -d --restart=always -p8080:8080 --log-driver json-file --log-opt tag="{{.ImageName}}|{{.Name}}" "${FULL_DOCKER_CONTAINER_NAME}"
+  tags:
+    - prod-stage-shell
+  when: manual
+  only:
+    - master
+    - uat

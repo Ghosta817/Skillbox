@@ -1,0 +1,15 @@
+---
+
+- name: Pretask For Promtail
+  include_tasks: tasks/pre_install.yml
+
+- name: Install Promtail
+  include_tasks: tasks/install_promtail.yml
+
+- name: Ensure Promtail service is started and enabled
+  become: True
+  systemd:
+    daemon_reload: True
+    name: "{{ promtail_systemd_service }}"
+    state: started
+    enabled: True

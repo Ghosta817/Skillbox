@@ -1,0 +1,118 @@
+---
+
+- name: Ensure unzip package is available
+  package:
+    name: unzip
+    state: present
+    update_cache: "{{ loki_apt_update_cache }}"
+
+- name: Create {{ loki_system_group }} system group
+  group:
+    name: "{{ loki_system_group }}"
+    system: True
+    state: present
+  when: loki_system_group != "root"
+
+- name: Create {{ loki_system_user }} system user
+  ansible.builtin.user:
+    name: "{{ loki_system_user }}"
+    system: True
+    shell: "/usr/sbin/nologin"
+    group: "{{ loki_system_group }}"
+    createhome: False
+    home: "{{ loki_storage_dir }}"
+  when: loki_system_user != "root"
+
+- name: Ensure /usr/local/bin exists
+  file:
+    path: /usr/local/bin
+    state: directory
+    mode: 0755
+
+- name: Create Loki data directory
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ loki_system_user }}"
+    group: "{{ loki_system_group }}"
+    mode: 0755
+  with_items:
+    - "{{ loki_storage_dir }}"
+    - "{{ loki_storage_dir }}/index"
+    - "{{ loki_storage_dir }}/chunks"
+
+- name: Create Loki configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: "{{ loki_system_group }}"
+    mode: 0770
+  with_items:
+    - "{{ loki_config_dir }}"
+
+- name: Create application dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ loki_system_user }}"
+    group: "{{ loki_system_group }}"
+    mode: 0755
+  with_items:
+    - "{{ loki_install_dir }}"
+    - "{{ loki_install_dir }}/{{ loki_version }}"
+
+- name: Check loki binary
+  stat:
+    path: "{{ loki_install_dir }}/{{ loki_version }}/loki-linux-amd64"
+  register: loki_binary
+
+- name: Download loki binaries
+  get_url:
+    url: "{{ loki_dist_url }}"
+    dest: "{{ loki_tmp_dir }}/{{ loki_version }}_loki-linux-amd64.zip"
+    force: True
+    checksum: "{{ loki_checksum }}"
+  register: result
+  until: result is succeeded
+  retries: 5
+  delay: 15
+  when: not loki_binary.stat.exists
+
+- name: Unpack loki binaries
+  ignore_errors: "{{ ansible_check_mode }}"
+  unarchive:
+    src: "{{ loki_tmp_dir }}/{{ loki_version }}_loki-linux-amd64.zip"
+    dest: "{{ loki_install_dir }}/{{ loki_version }}"
+    creates: "{{ loki_install_dir }}/{{ loki_version }}/loki-linux-amd64"
+    mode: 0755
+    remote_src: True
+
+- name: Create symlink to current version
+  notify:
+    - Restart loki
+  ignore_errors: "{{ ansible_check_mode }}"
+  file:
+    state: link
+    src: "{{ loki_install_dir }}/{{ loki_version }}/loki-linux-amd64"
+    dest: /usr/local/bin/loki
+    mode: 0755
+
+- name: Write config
+  notify:
+    - Restart loki
+  template:
+    src: config.j2
+    dest: "{{ loki_config_file }}"
+    force: True
+    owner: root
+    group: "{{ loki_system_group }}"
+    mode: 0644
+
+- name: Create systemd service unit
+  notify:
+    - Restart loki
+  template:
+    src: "{{ loki_systemd_service_template_file }}"
+    dest: "/etc/systemd/system/{{ loki_systemd_service }}.service"
+    mode: 0644

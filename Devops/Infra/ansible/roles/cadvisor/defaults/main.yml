@@ -1,0 +1,23 @@
+---
+# defaults file for cAdvisor
+
+# Version
+cadvisor_version: v0.29.0
+
+# Cadvisor source path if offline
+cadvisor_binary_local_dir: ""
+
+# SHA256 checksum
+cadvisor_checksum: >-
+  f5c8deb31eb12cae38007f0f4a208e0b9ba2b2ad6a1c9610b32d113221880d4e
+# Listen port
+cadvisor_port: 9099
+
+# Base cadvisor url
+cadvisor_url: https://github.com/google/cadvisor/releases/download
+
+# Download url
+cadvisor_download: "{{ cadvisor_url }}/{{ cadvisor_version }}/cadvisor"
+
+# Extra runtime options
+cadvisor_runtime_options: ""

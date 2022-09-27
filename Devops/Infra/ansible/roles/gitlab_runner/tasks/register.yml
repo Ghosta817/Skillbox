@@ -1,0 +1,45 @@
+---
+
+- name: List configured runners
+  command: gitlab-runner list
+  register: configured_runners
+  changed_when: False
+
+- name: Unregister old runner
+  command: gitlab-runner unregister --all-runners
+  when: configured_runners.stderr_lines[2] is defined
+
+- name: Register docker runner to GitLab
+  command: gitlab-runner register >
+    --non-interactive
+    --url "{{ runner_registration_url }}"
+    --registration-token "{{ runner_registration_token }}"
+    --description "{{ runner_description }}"
+    --tag-list "{{ runner_registration_docker_tags | join(',') }}"
+    --executor "{{ runner_registration_docker_executor }}"
+    --docker-image "{{ runner_registration_docker_image }}"
+    --docker-privileged
+  when: ('test' in inventory_hostname) 
+
+- name: Set facts for prod server
+  set_fact:
+    runner_registration_shell_tags: ["prod-stage-shell"]
+  when: ('prod' in inventory_hostname)
+
+- name: Register shell runner to GitLab
+  command: gitlab-runner register >
+    --non-interactive
+    --url "{{ runner_registration_url }}"
+    --registration-token "{{ runner_registration_token }}"
+    --description "{{ runner_description }}"
+    --tag-list "{{ runner_registration_shell_tags | join(',') }}"
+    --executor "{{ runner_registration_shell_executor }}"
+
+- name: Verify that gitlab-runner has connect to GitLab
+  command: gitlab-runner verify
+  
+- name: Start service gitlab-runner, if not started
+  systemd:
+    name: gitlab-runner
+    state: started
+  become: true

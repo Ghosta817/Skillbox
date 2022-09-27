@@ -1,0 +1,6 @@
+---
+# vars file for NodeExporter
+
+userId: node_exporter
+groupId: node_exporter
+node_exporter_version: 1.3.1

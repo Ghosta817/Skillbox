@@ -1,0 +1,24 @@
+---
+
+packages:
+  - python3-pip
+  - python3-setuptools
+
+# Gitlab runner
+runner_binary_version: v12.4.1
+runner_binary_url: "https://gitlab-runner-downloads.s3.amazonaws.com/{{ runner_binary_version }}/binaries/gitlab-runner-linux-amd64"
+
+runner_username: gitlab-runner
+runner_working_dir: /data
+
+# Gitlab
+
+runner_description: "{{ ansible_host }}"
+runner_registration_url: https://gitlab.skillbox.ru/
+runner_registration_token: "R9nFxd1Y_MLCs5AW6wot"
+runner_registration_docker_tags: ["dev", "test-stage-docker"]
+runner_registration_docker_executor: "docker" # ssh, docker+machine, docker-ssh+machine, kubernetes, docker, parallels, virtualbox, docker-ssh, shell
+runner_registration_docker_image: "alpine:latest"
+
+runner_registration_shell_tags: ["test-stage-shell"]
+runner_registration_shell_executor: "shell"

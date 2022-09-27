@@ -1,0 +1,7 @@
+---
+
+- name: Pretask For Node Exporter
+  include_tasks: tasks/pre_install.yml
+
+- name: Install Prometheus Node Exporter
+  include_tasks: tasks/install_node_exporter.yml

@@ -1,0 +1,69 @@
+---
+# tasks file for Grafana
+
+#  We are using reverse-proxy and listen port is default (80)
+# - name: Allow TCP Ports
+#   iptables:
+#     chain: INPUT
+#     rule_num: '1'
+#     action: insert
+#     protocol: tcp
+#     jump: ACCEPT
+#     destination_port: '3000'
+
+- name: Import Grafana Apt Key
+  apt_key:
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Add APT Repository
+  apt_repository:
+    repo: deb https://packages.grafana.com/oss/deb stable main
+    state: present
+
+- name: Install Grafana on Debian Family
+  apt:
+    name: grafana
+    state: present
+  notify:
+    - grafana systemd
+
+- name: Configure Grafana
+  replace:
+    path: "/etc/grafana/grafana.ini"
+    regexp: "{{ item.target_text  }}"
+    replace: "{{ item.replace_text }}"
+    backup: yes
+  with_items:
+  - { target_text: ";http_port = 3000", replace_text: "http_port = 3000" }
+  - { target_text: ";domain = localhost", replace_text: "domain = {{ grafana_domain_name }}"}
+
+- name: Copy Grafana DataBase
+  copy: 
+    src: ./files/grafana.db
+    dest: /var/lib/grafana/grafana.db
+    owner: "{{ grafana_userId }}"
+    group: "{{ grafana_groupId }}"
+    mode: preserve
+
+- name: Restart Grafana service
+  systemd:
+    name: grafana-server
+    state: restarted
+
+- name: Wait for Grafana will answer on port 3000
+  wait_for:
+    port: 3000
+    delay: 5
+
+- name: Create Loki datasource
+  community.grafana.grafana_datasource:
+    name: Loki
+    grafana_url: "{{ grafana_full_domain_name }}"
+    grafana_user: "{{ admin_user }}"
+    grafana_password: "{{ admin_password }}"
+    tls_skip_verify: yes
+    ds_type: loki
+    ds_url: "{{ internal_loki_ip }}"
+    # overwrite: yes
+    # state: present

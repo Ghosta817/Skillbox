@@ -1,0 +1,9 @@
+---
+# handlers file for NodeExporter
+
+- name: firewalld systemd restart
+  command: firewall-cmd --reload
+    
+- name: systemd reload
+  systemd:
+    daemon_reload: yes

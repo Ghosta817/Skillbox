@@ -1,0 +1,60 @@
+groups:
+  - name: custom_rules
+    rules:
+      - record: node_memory_MemFree_percent
+        expr: 100 - (100 * node_memory_MemFree_bytes / node_memory_MemTotal_bytes)
+
+      - record: node_filesystem_free_percent
+        expr: 100 * node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}
+        
+      - record: node_cpu_load_percent
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100)
+        
+      - record: node_network_receive_bytes_rate
+        expr: sum by (instance) (rate(node_network_receive_bytes_total[1m])) / 1024 / 1024
+          
+
+  - name: alert_rules
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+               
+      - alert: PrometheusAllTargetsMissing
+        expr: count by (job) (up) == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus all targets missing (instance {{ $labels.instance }})
+          description: "A Prometheus job does not have living target anymore."
+
+      - alert: DiskSpaceFree10Percent
+        expr: node_filesystem_free_percent <= 10
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance [{{ $labels.instance }}] has 10% or less Free disk space"
+          description: "[{{ $labels.instance }}] has only {{ $value }}% or less free."
+          
+      - alert: CpuLoadMoreThen80Percent
+        expr: node_cpu_load_percent > 85
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance [{{ $labels.instance }}] cpu load more then 80%"
+          description: "[{{ $labels.instance }}] cpu has {{ $value }}% of load."
+          
+      - alert: HostUnusualNetworkThroughputIn
+        expr: node_network_receive_bytes_rate > 20
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual network throughput in (instance {{ $labels.instance }})
+          description: "Host network interfaces are probably receiving too much data (> 20 MB/s)."
